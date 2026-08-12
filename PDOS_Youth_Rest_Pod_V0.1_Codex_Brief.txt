@@ -1,0 +1,22 @@
+PDoS / Codex execution brief — Youth Rest Pod V0.1
+
+Goal:
+Build ONLY the PRIMARY_SHELL outer envelope from the attached JSON. Do not add seat, base, lighting, sensor, seams, or interior trim.
+
+Rules:
+1. Units = mm. X right, Y rear, Z up.
+2. Bounding box is LOCKED: 1450 W × 1650 D × 1750 H.
+3. Left/right symmetry about YZ is LOCKED.
+4. Generate each horizontal closed profile using the asymmetric superellipse formula and the station parameters in primary_shell.z_stations.
+5. Use 48 samples per profile, fit/interpolate a smooth periodic NURBS curve, then loft profiles in ascending Z.
+6. Avoid adding arbitrary control points beyond what is needed to fit the sampled profiles.
+7. Check seam alignment before lofting.
+8. Inspect Zebra and curvature graph. Target visually smooth G2-like flow; no pinching around S08-S09.
+9. Build the front opening from the provided opening data, mirror across YZ, create a smooth closed boundary, pull/project to the shell, and trim.
+10. Do NOT offset thickness until the outer shell and opening shape are approved.
+
+Deliver:
+- Rhino geometry in editable NURBS/BRep form.
+- Keep all source section curves on a separate layer named PDOS_GUIDES.
+- Put shell on PDOS_PRIMARY_SHELL.
+- Save a viewport screenshot from front-perspective and right-side perspective for shape comparison.

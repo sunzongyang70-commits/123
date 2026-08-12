@@ -1,0 +1,41 @@
+PDoS / Codex Rhino reconstruction experiment — V0.1
+
+OBJECTIVE
+Use the STL as geometric truth and the JSON as a dissection/curve package. The goal is NOT to convert every mesh triangle to NURBS. The goal is to reconstruct a small number of editable curves/surfaces while preserving the generated shape.
+
+FILES
+- QiQeHV_-aQnoxgHyISf3L.stl
+- PDOS_Mesh_Dissection_V0.1.json
+
+PHASE 1 — REFERENCE
+1. Import STL unchanged to layer PDOS_REF_MESH and lock it.
+2. Preserve native STL coordinates and scale. Units are unknown; do not guess mm yet.
+3. Separate the 2 connected components. Reconstruct component 0 first; component 1 is a small detached detail.
+
+PHASE 2 — CURVE CAGE
+4. Read sections.x / sections.y / sections.z from JSON.
+5. Create each simplified polyline on the matching layer PDOS_SEC_X/Y/Z.
+6. For each meaningful closed loop, fit a degree-3 periodic NURBS curve. Use a conservative fit tolerance around 0.0015 × bbox diagonal.
+7. Keep BOTH raw simplified polylines and fitted NURBS curves for comparison.
+8. Do not build surfaces yet. First save screenshots of the 3D curve cage overlaid on the locked reference mesh.
+
+PHASE 3 — REGION INTERPRETATION
+9. Identify where loop topology remains stable across neighboring stations. Those ranges are candidates for one coherent surface patch.
+10. Do not loft through stations where loop count/topology changes. Split the product into regions there.
+11. Use the X/Y/Z section families together to decide surface flow. Prefer Sweep2/NetworkSrf/RebuildUV over blind global Loft when cross-direction constraints are needed.
+
+PHASE 4 — SURFACE REBUILD
+12. Rebuild only one dominant visible region first as a test patch.
+13. Target low CV count. Rebuild curves before increasing surface complexity.
+14. Use MatchSrf for G1/G2 where design intent suggests smooth continuation.
+15. Compare rebuilt surface against reference mesh by sampled closest-point deviation. Record max and RMS deviation.
+
+HARD RULES
+- Do not use MeshToNURB as the final reconstruction strategy.
+- Do not convert all 506,186 triangles into individual NURBS faces.
+- Do not invent hidden geometry when the mesh already supplies XYZ truth.
+- Do not force all sections into one loft.
+- Keep construction curves editable and on separate layers.
+
+FIRST DELIVERABLE
+A Rhino file containing: locked reference mesh + reconstructed X/Y/Z NURBS section cage only. No final surfaces yet. This lets us judge whether the geometric dissection preserves the Hunyuan model before committing to surface topology.

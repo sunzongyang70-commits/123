@@ -1,0 +1,240 @@
+{
+  "schema": "PDoS_GEOMETRY_PACKAGE",
+  "version": "0.1",
+  "project": "Youth_Rest_Pod",
+  "source": {
+    "type": "single_perspective_reference",
+    "reference_file": "新建模图.png",
+    "note": "V0.1 is a geometry hypothesis derived from one perspective image. Hidden/rear geometry is intentionally ESTIMATED."
+  },
+  "units": "mm",
+  "coordinate_system": {
+    "origin": "ground_projection_of_main_shell_center",
+    "x_positive": "right",
+    "y_positive": "rear",
+    "z_positive": "up"
+  },
+  "bounding_box": {
+    "width_x": {
+      "value": 1450,
+      "status": "LOCKED"
+    },
+    "depth_y": {
+      "value": 1650,
+      "status": "LOCKED"
+    },
+    "height_z": {
+      "value": 1750,
+      "status": "LOCKED"
+    }
+  },
+  "symmetry": {
+    "plane": "YZ",
+    "left_right": "LOCKED"
+  },
+  "construction_strategy": {
+    "stage_1": "Build PRIMARY_SHELL outer envelope only",
+    "stage_2": "Cut FRONT_OPENING",
+    "stage_3": "Add rear/side shell segmentation",
+    "stage_4": "Add base, seat, light ring, sensor and details"
+  },
+  "primary_shell": {
+    "representation": "stacked_closed_horizontal_profiles_loft",
+    "surface_target": "single smooth outer envelope before trimming",
+    "continuity_target": "G2_visual",
+    "profile_formula": {
+      "type": "asymmetric_superellipse",
+      "definition": "For each z-station, x=rx*sgn(cos t)*abs(cos t)^(2/n); y=ry(t)*sgn(sin t)*abs(sin t)^(2/n), where ry=rear_depth for sin(t)>=0 and front_depth for sin(t)<0.",
+      "sample_count": 48,
+      "closed": true
+    },
+    "z_stations": [
+      {
+        "id": "S00",
+        "z": 40,
+        "rx": 540,
+        "front_depth": 500,
+        "rear_depth": 610,
+        "n": 2.35,
+        "status": "ESTIMATED"
+      },
+      {
+        "id": "S01",
+        "z": 150,
+        "rx": 650,
+        "front_depth": 650,
+        "rear_depth": 760,
+        "n": 2.45,
+        "status": "ESTIMATED"
+      },
+      {
+        "id": "S02",
+        "z": 350,
+        "rx": 705,
+        "front_depth": 735,
+        "rear_depth": 805,
+        "n": 2.55,
+        "status": "ESTIMATED"
+      },
+      {
+        "id": "S03",
+        "z": 600,
+        "rx": 725,
+        "front_depth": 785,
+        "rear_depth": 825,
+        "n": 2.65,
+        "status": "ESTIMATED"
+      },
+      {
+        "id": "S04",
+        "z": 900,
+        "rx": 710,
+        "front_depth": 800,
+        "rear_depth": 815,
+        "n": 2.75,
+        "status": "ESTIMATED"
+      },
+      {
+        "id": "S05",
+        "z": 1200,
+        "rx": 660,
+        "front_depth": 760,
+        "rear_depth": 780,
+        "n": 2.65,
+        "status": "ESTIMATED"
+      },
+      {
+        "id": "S06",
+        "z": 1450,
+        "rx": 545,
+        "front_depth": 650,
+        "rear_depth": 665,
+        "n": 2.45,
+        "status": "ESTIMATED"
+      },
+      {
+        "id": "S07",
+        "z": 1630,
+        "rx": 365,
+        "front_depth": 470,
+        "rear_depth": 485,
+        "n": 2.25,
+        "status": "ESTIMATED"
+      },
+      {
+        "id": "S08",
+        "z": 1720,
+        "rx": 175,
+        "front_depth": 245,
+        "rear_depth": 255,
+        "n": 2.1,
+        "status": "ESTIMATED"
+      },
+      {
+        "id": "S09",
+        "z": 1750,
+        "rx": 20,
+        "front_depth": 35,
+        "rear_depth": 35,
+        "n": 2.0,
+        "status": "ESTIMATED"
+      }
+    ]
+  },
+  "front_opening": {
+    "status": "ESTIMATED",
+    "plane_hint": "opening curve lies on front half of shell and is projected/pulled to shell before trim",
+    "center_plane_points_x0": [
+      [
+        0,
+        -765,
+        185
+      ],
+      [
+        0,
+        -790,
+        420
+      ],
+      [
+        0,
+        -790,
+        760
+      ],
+      [
+        0,
+        -735,
+        1110
+      ],
+      [
+        0,
+        -625,
+        1420
+      ],
+      [
+        0,
+        -450,
+        1585
+      ]
+    ],
+    "half_boundary_right_xz": [
+      [
+        420,
+        185
+      ],
+      [
+        555,
+        300
+      ],
+      [
+        585,
+        560
+      ],
+      [
+        560,
+        860
+      ],
+      [
+        500,
+        1160
+      ],
+      [
+        390,
+        1410
+      ],
+      [
+        235,
+        1560
+      ],
+      [
+        0,
+        1620
+      ]
+    ],
+    "mirror_about_yz": true,
+    "construction_note": "Create a smooth closed opening boundary from mirrored right-half points; project/pull to outer shell, then trim."
+  },
+  "shell_thickness": {
+    "value": 45,
+    "status": "ESTIMATED",
+    "method": "OffsetSrf inward after outer shell and opening are stable"
+  },
+  "validation": {
+    "purpose": "V0.1 shape test only",
+    "acceptance": [
+      "Overall proportions approximately match reference",
+      "Top is rounded but not spherical",
+      "Maximum body width occurs around z=500-900 mm",
+      "Front mouth is vertically elongated with soft triangular/oval character",
+      "Rear volume is slightly fuller than front volume",
+      "No local kinks in zebra/curvature graph"
+    ],
+    "do_not_model_yet": [
+      "seat",
+      "base",
+      "lighting",
+      "sensor",
+      "panel seams",
+      "interior trim"
+    ]
+  }
+}
