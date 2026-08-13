@@ -1,0 +1,297 @@
+{
+  "analysis_meta": {
+    "phase": "1.2",
+    "step": "5 - Patch Candidate Generation",
+    "ground_truth": "第一个建模参考图.stl",
+    "evidence_sources": [
+      "PHASE_1_2_FEATURE_EVIDENCE.json",
+      "PHASE_1_2_TOPOLOGY_EVENTS.json",
+      "PDOS_Youth_Rest_Pod_Geometry_V0.1.json (design prior, NOT ground truth)"
+    ],
+    "timestamp": "2026-08-12T17:40:00Z",
+    "status": "PRELIMINARY"
+  },
+  "patch_candidates": {
+    "PATCH_001_MAIN_BODY_UPPER": {
+      "id": "PATCH_001",
+      "name": "Main Body - Upper Section (Head)",
+      "mesh_region": "Component 0, upper portion (Z ≈ 0.45-0.75 native coords)",
+      "boundary_definition": {
+        "top_boundary": "APEX (topological singularity / pole at Z_max)",
+        "bottom_boundary": "TRANSITION_ZONE where body begins to widen significantly (Z ≈ 0.45)",
+        "side_boundaries": "OPENING_EDGE (front) + smooth transition (sides/rear)"
+      },
+      "topology_type": "LOFT_TO_APEX",
+      "construction_method": "UNASSIGNED",
+      "surface_characteristics": {
+        "curvature": "HIGH_POSITIVE (convex dome, tapering to point)",
+        "continuity_target": "G2 (smooth curvature)",
+        "asymmetry": "FRONT-BACK asymmetry (front opening boundary creates discontinuity)"
+      },
+      "parametrization": {
+        "u_direction": "RADIAL_ANGLE (circumferential around main axis)",
+        "v_direction": "AXIAL (Z, pointing upward toward apex)",
+        "u_range": [0, 2π] or similar,
+        "v_range": [0, 1] (normalized toward apex)"
+      },
+      "patch_topology": "4-SIDED_QUAD (when opening is excluded; opening introduces boundary singularity)",
+      "opening_treatment": "BOUNDARY EDGE; opening curve forms hard boundary loop",
+      "neighboring_patches": ["PATCH_002_MAIN_BODY_LOWER", "PATCH_004_OPENING_RIM"],
+      "blocking_features": ["FRONT_OPENING"],
+      "confidence": "HIGH",
+      "ambiguity_flags": [
+        "OPENING_EDGE_DETAIL: Is opening rim sharp or smooth transition? Affects G1/G2 continuity."
+      ],
+      "notes": "Consider whether to include entire dome in one LOFT-to-apex surface, or split into upper+lower. Current recommendation: SINGLE_PATCH for simplicity."
+    },
+    "PATCH_002_MAIN_BODY_LOWER": {
+      "id": "PATCH_002",
+      "name": "Main Body - Lower/Middle Section",
+      "mesh_region": "Component 0, widest body section (Z ≈ 0.15-0.45 native coords)",
+      "boundary_definition": {
+        "top_boundary": "TRANSITION to PATCH_001 (smooth)",
+        "bottom_boundary": "TRANSITION to PATCH_003 (smooth or feature-based)",
+        "side_boundaries": "OPENING_EDGE (front) + smooth (sides/rear)"
+      },
+      "topology_type": "LOFT_BETWEEN_PROFILES",
+      "construction_method": "UNASSIGNED",
+      "surface_characteristics": {
+        "curvature": "MODERATE_TO_HIGH_POSITIVE (expanding then stabilizing diameter)",
+        "continuity_target": "G2 with PATCH_001",
+        "shape_description": "Maximum width zone; widest part of egg/capsule"
+      },
+      "parametrization": {
+        "u_direction": "RADIAL_ANGLE",
+        "v_direction": "AXIAL (Z, pointing upward)"
+      },
+      "patch_topology": "4-SIDED_QUAD",
+      "opening_treatment": "FRONT boundary includes opening loop as hard edge",
+      "neighboring_patches": ["PATCH_001_MAIN_BODY_UPPER", "PATCH_003_LOWER_BODY"],
+      "blocking_features": ["FRONT_OPENING"],
+      "confidence": "HIGH",
+      "ambiguity_flags": [
+        "PATCH_SPLIT_DECISION: Should this be one patch or split circumferentially (e.g., left, front, right)? One large patch is simpler if opening doesn't create excessive distortion."
+      ],
+      "notes": "This is the primary visible region in Rhino screenshot. Likely the most critical patch for overall aesthetic."
+    },
+    "PATCH_003_LOWER_BODY_BASE": {
+      "id": "PATCH_003",
+      "name": "Lower Body - Base Transition",
+      "mesh_region": "Component 0, lower section (Z ≈ 0.0-0.15 native coords)",
+      "boundary_definition": {
+        "top_boundary": "TRANSITION to PATCH_002 (smooth)",
+        "bottom_boundary": "BASE_PLATFORM surface or ground plane",
+        "side_boundaries": "Blend to base perimeter"
+      },
+      "topology_type": "LOFT_BETWEEN_BASE_AND_BODY",
+      "construction_method": "UNASSIGNED",
+      "surface_characteristics": {
+        "curvature": "MODERATE (transition zone)",
+        "continuity_target": "G2 with PATCH_002; G1 or G0 with base (TBD)",
+        "shape_description": "Tapers from main body width down to base footprint"
+      },
+      "parametrization": {
+        "u_direction": "RADIAL_ANGLE",
+        "v_direction": "AXIAL (Z, pointing downward toward base)"
+      },
+      "patch_topology": "4-SIDED_QUAD",
+      "opening_treatment": "Opening may or may not intersect this zone depending on opening depth; REQUIRES VERIFICATION",
+      "neighboring_patches": ["PATCH_002_MAIN_BODY_LOWER", "PATCH_005_BASE_PLATFORM"],
+      "blocking_features": [],
+      "confidence": "PROBABLE",
+      "ambiguity_flags": [
+        "BASE_MODELLING_DECISION: Design notes say 'do not model yet: base'. Should PATCH_003 be excluded from Phase 1.2 reconstruction?",
+        "OPENING_EXTENT: Does opening penetrate into this zone? If yes, affects patch topology."
+      ],
+      "notes": "Lower priority for Phase 1.2 if base is deferred. Can be modeled in Phase 1.3."
+    },
+    "PATCH_004_OPENING_RIM": {
+      "id": "PATCH_004",
+      "name": "Opening Rim / Boundary Surface",
+      "mesh_region": "Component 0, front opening perimeter (front face, Y ≈ negative direction, Z ≈ 0.2-0.65)",
+      "boundary_definition": {
+        "outer_boundary": "OPENING_CURVE (hard topology boundary, vertically elongated oval/pear shape)",
+        "inner_boundary": "VOID (interior of opening)",
+        "side_boundaries": "BLEND to adjacent body patches (PATCH_001, PATCH_002)"
+      },
+      "topology_type": "SURFACE_WITH_OPENING_EDGE",
+      "construction_method": "UNASSIGNED",
+      "surface_characteristics": {
+        "curvature": "VARIABLE (depends on exact opening rim geometry; likely concave toward exterior)",
+        "continuity_target": "G1 with PATCH_001 and PATCH_002 along blend boundaries",
+        "shape_description": "Inner surface of opening rim; likely matches swept/pulled profile onto shell"
+      },
+      "parametrization": {
+        "u_direction": "CIRCUMFERENTIAL around opening loop",
+        "v_direction": "DEPTH (inward from rim edge into opening)",
+        "note": "Local coordinate system derived from opening curve, NOT global Z"
+      },
+      "patch_topology": "4-SIDED_QUAD or more complex if opening profile has inflections",
+      "opening_is_blocking_feature": true,
+      "neighboring_patches": ["PATCH_001_MAIN_BODY_UPPER", "PATCH_002_MAIN_BODY_LOWER"],
+      "blocking_features": ["OPENING_BOUNDARY (hard boundary between inside/outside)"],
+      "confidence": "PROBABLE",
+      "ambiguity_flags": [
+        "OPENING_DEPTH: How deep/thick is the opening rim? Affects v-direction parametrization.",
+        "OPENING_PROFILE_SHAPE: Is rim a simple cylindrical pull or more complex curve? Affects construction_method.",
+        "OPENING_CONTINUITY: Should opening rim be G0 (sharp edge visible), G1 (tangent), or G2 (smooth curvature) with surrounding body?"
+      ],
+      "notes": "This patch may be best handled by Rhino MatchSrf or similar continuity-based surface fitting after PATCH_001, PATCH_002 are established."
+    },
+    "PATCH_005_BASE_PLATFORM": {
+      "id": "PATCH_005",
+      "name": "Base Platform / Foot",
+      "mesh_region": "Component 0, ground plane region (Z ≈ 0, Z_min vicinity) + possibly Component 1 (secondary detail)",
+      "boundary_definition": {
+        "outer_boundary": "Base perimeter (footprint of main shell)",
+        "inner_boundary": "VOID or attachment interface to main body",
+        "side_boundaries": "Smooth blend with PATCH_003"
+      },
+      "topology_type": "FLAT_OR_SLIGHTLY_CURVED_PLATFORM",
+      "construction_method": "UNASSIGNED",
+      "surface_characteristics": {
+        "curvature": "LOW (mostly flat or gentle swell)",
+        "continuity_target": "G0 or G1 with main body (TBD)",
+        "shape_description": "Load-bearing platform; may include structural details or sensor mounts (design: 'do not model yet')"
+      },
+      "parametrization": {
+        "u_direction": "X (left-right)",
+        "v_direction": "Y (front-back)",
+        "note": "Local 2D Cartesian grid on base plane"
+      },
+      "patch_topology": "4-SIDED_QUAD",
+      "neighboring_patches": ["PATCH_003_LOWER_BODY_BASE"],
+      "blocking_features": [],
+      "confidence": "LOW (design prior says 'do not model yet')",
+      "ambiguity_flags": [
+        "PHASE_1_2_SCOPE: Should base be included in current reconstruction? Design says NO. Recommend DEFERRING to Phase 1.3 or later."
+      ],
+      "notes": "May be better to EXCLUDE from Phase 1.2 and focus on main shell (PATCH_001, PATCH_002, PATCH_004). If needed, can be added in Phase 1.3."
+    },
+    "COMPONENT_1_SECONDARY_DETAIL": {
+      "id": "PATCH_006",
+      "name": "Secondary Component (Detached or Minimally Connected)",
+      "mesh_region": "Component 1 (all 3906 triangles, 1955 vertices)",
+      "bounding_box": {
+        "min": [0.172497, -0.30094996, 0.34603703],
+        "max": [0.313849, -0.14453897, 0.37510899]
+      },
+      "topology_status": "DISCONNECTED from main shell (Component 0)",
+      "boundary_definition": {
+        "type": "FULLY_EXTERNAL (all edges are exposed)",
+        "role": "UNDEFINED - requires user clarification"
+      },
+      "topology_type": "UNKNOWN",
+      "construction_method": "UNASSIGNED",
+      "surface_characteristics": {
+        "extents": [0.141352, 0.15641099, 0.02907196],
+        "aspect_ratio": "FLAT (Z extent 0.029 << X, Y extents ~0.14-0.15)",
+        "shape_description": "Small, flat or plate-like detail; possibly a base insert, platform, or sensor assembly"
+      },
+      "confidence": "LOW (role AMBIGUOUS)",
+      "ambiguity_flags": [
+        "COMPONENT_ROLE: Is this part of the main model or a separate assembly? NOT CLEAR from data.",
+        "GEOMETRY_PURPOSE: Base platform? Foot? Structural insert? Sensor module? REQUIRES USER CLARIFICATION.",
+        "MODELING_SCOPE: Should PATCH_006 be included in Phase 1.2 reconstruction? Recommend DEFERRING pending user input."
+      ],
+      "recommendation": "DO NOT include in Phase 1.2 patch candidates until role is clarified. Flag for Phase 1.3 / post-hoc discussion."
+    }
+  },
+  "patch_candidate_summary": {
+    "confirmed_patches": [
+      "PATCH_001_MAIN_BODY_UPPER",
+      "PATCH_002_MAIN_BODY_LOWER",
+      "PATCH_004_OPENING_RIM"
+    ],
+    "probable_patches": [
+      "PATCH_003_LOWER_BODY_BASE"
+    ],
+    "deferred_patches": [
+      "PATCH_005_BASE_PLATFORM (design: 'do not model yet')",
+      "PATCH_006_COMPONENT_1 (role AMBIGUOUS, requires clarification)"
+    ],
+    "total_recommended_for_phase_1_2": 3,
+    "total_including_deferred": 6,
+    "confidence_summary": "HIGH for main body (PATCH_001, PATCH_002, PATCH_004); PROBABLE for lower transition (PATCH_003); LOW for base and secondary component"
+  },
+  "patch_connectivity": {
+    "adjacency_graph": {
+      "PATCH_001": ["PATCH_002", "PATCH_004"],
+      "PATCH_002": ["PATCH_001", "PATCH_003", "PATCH_004"],
+      "PATCH_003": ["PATCH_002", "PATCH_005"],
+      "PATCH_004": ["PATCH_001", "PATCH_002"],
+      "PATCH_005": ["PATCH_003"],
+      "PATCH_006": []
+    },
+    "continuity_constraints": {
+      "PATCH_001_to_PATCH_002": "G2 desired (smooth curvature transition)",
+      "PATCH_002_to_PATCH_003": "G1 or G2 desired (smooth transition to base)",
+      "PATCH_001_to_PATCH_004": "G1 desired (tangent along opening edge)",
+      "PATCH_002_to_PATCH_004": "G1 desired (tangent along opening edge)",
+      "PATCH_003_to_PATCH_005": "G0 or G1 (TBD based on base geometry)"
+    }
+  },
+  "u_v_flow_guidance": {
+    "note": "These are CANDIDATES only; actual U/V assignment deferred to Phase 1.3",
+    "PATCH_001": {
+      "u_preferred": "RADIAL_ANGLE (theta, 0-2π around vertical axis)",
+      "v_preferred": "AXIAL (Z, normalized from base to apex)",
+      "rationale": "Loft-to-apex topology naturally suits this parametrization"
+    },
+    "PATCH_002": {
+      "u_preferred": "RADIAL_ANGLE",
+      "v_preferred": "AXIAL (Z)",
+      "rationale": "Horizontal loft between two profile loops"
+    },
+    "PATCH_003": {
+      "u_preferred": "RADIAL_ANGLE",
+      "v_preferred": "AXIAL (Z)",
+      "rationale": "Transition zone; similar to PATCH_002"
+    },
+    "PATCH_004": {
+      "u_preferred": "OPENING_CIRCUMFERENTIAL (around opening loop perimeter)",
+      "v_preferred": "DEPTH (inward from opening edge)",
+      "rationale": "Local coordinate system based on opening curve, not global Z"
+    },
+    "PATCH_005": {
+      "u_preferred": "X (left-right)",
+      "v_preferred": "Y (front-back)",
+      "rationale": "Planar or near-planar; use local 2D Cartesian grid"
+    }
+  },
+  "critical_decisions_required_before_phase_1_3": [
+    {
+      "decision": "PATCH_003 inclusion?",
+      "options": [
+        "INCLUDE in Phase 1.2 (model lower body + base transition)",
+        "DEFER to Phase 1.3 (focus on main body only, add base later)"
+      ],
+      "recommendation": "DEFER (design notes say 'do not model yet: base')"
+    },
+    {
+      "decision": "PATCH_005 and PATCH_006 (base + secondary component)?",
+      "options": [
+        "EXCLUDE from current reconstruction",
+        "Clarify role and include if needed"
+      ],
+      "recommendation": "EXCLUDE from Phase 1.2; defer to Phase 1.3 or post-hoc discussion"
+    },
+    {
+      "decision": "Opening rim surface (PATCH_004)?",
+      "options": [
+        "Model opening surface explicitly (PATCH_004)",
+        "Use Rhino MatchSrf or blend surface after main body patches complete"
+      ],
+      "recommendation": "Option 1 (explicit PATCH_004) for better control; revisit if distortion occurs"
+    },
+    {
+      "decision": "Opening edge continuity (G0 vs G1 vs G2)?",
+      "options": [
+        "Sharp edge (G0) - visible crease",
+        "Tangent join (G1) - smooth transition",
+        "Smooth curvature (G2) - seamless blend"
+      ],
+      "recommendation": "INSPECT Rhino model at opening rim; user decision"
+    }
+  ]
+}
