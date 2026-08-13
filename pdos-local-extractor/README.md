@@ -30,7 +30,7 @@ All computed values come **strictly** from the user-supplied STL file.
 
 ## 使用要求 / Requirements
 
-- **Python 3.11 or later** is recommended.
+- **Python 3.11 or later** is required.
   - Check your Python version: open Terminal and type `python3 --version`
   - Download from https://www.python.org/downloads/macos/
 - **No external packages required.** Only Python standard library is used.
@@ -60,6 +60,23 @@ No `pip install` step is required — there are no external dependencies.
 
 ## 如何运行 / How to run
 
+### Mac 双击运行（推荐）/ Double-click on macOS (recommended)
+
+1. 在 Finder 中打开 `pdos-local-extractor` 文件夹。
+2. 双击 `run_extractor_macos.command`。
+3. 按窗口提示，把 STL 文件拖进终端窗口，然后按 Enter。
+4. 两个 JSON 会生成在 STL 文件所在目录。
+
+On first use, macOS may require the executable bit to be set. Run once:
+
+```bash
+cd /path/to/pdos-local-extractor
+chmod +x run_extractor_macos.command
+```
+
+The helper performs no upload or network request. It does not read old Phase
+1.2 JSON files and it stops after Phase 1.2A evidence and validation output.
+
 ### Basic command
 
 ```bash
@@ -76,6 +93,7 @@ python -m pdos_extractor \
   --output PATH_TO_OUTPUT_JSON \
   --topology-mode  raw|welded|both \
   --symmetry-mode  off|optional \
+  --weld-tolerance NON_NEGATIVE_FINITE_FLOAT \
   --fail-on-validation-error
 ```
 
@@ -85,6 +103,7 @@ python -m pdos_extractor \
 | `--output` | `./PRIMARY_MESH_EVIDENCE.json` | 输出 JSON 文件路径 |
 | `--topology-mode` | `both` | `raw` = 精确匹配；`welded` = 容差合并；`both` = 两者都算 |
 | `--symmetry-mode` | `off` | 对称分析（v0.1 中默认 UNKNOWN） |
+| `--weld-tolerance` | `1e-8 × bbox diagonal` | welded 模式容差；拒绝负数、NaN 和 Infinity |
 | `--fail-on-validation-error` | off | 验证 FAIL 时返回非零退出码（PASS_WITH_WARNINGS 不会触发） |
 
 ---
@@ -134,11 +153,27 @@ Contains:
   - Bounding box (min, max, extents, diagonal)
   - Connected component count and per-component statistics
   - Boundary edge count
-  - Ordered boundary loops with coordinates and perimeter
+  - Closed boundary loops, open chains, and branched graph evidence
   - Non-manifold edge count
   - Watertight flag
   - Euler characteristic (V − E + F)
 - Full provenance for every computed field
+
+### Provenance inheritance
+
+To keep the JSON readable, provenance is inherited at object level:
+
+- `input.provenance` applies to file size, SHA-256, format, units status,
+  triangle count, and parse result.
+- Each `topology.<variant>.provenance` applies to its vertex/edge/face counts,
+  bounding box, components, boundary records, non-manifold count, watertight
+  result, Euler characteristic, and weld tolerance.
+- Component and boundary coordinates are copied only from canonical vertices
+  derived from STL vertex records. No fallback coordinate is generated.
+
+Only `OBSERVED`, `DERIVED`, and `UNKNOWN` are valid epistemic provenance
+statuses. A malformed STL produces `STL_PARSE_ERROR`; partial triangles are not
+passed to topology analysis.
 
 ### PRIMARY_MESH_EVIDENCE.validation.json
 
@@ -198,7 +233,11 @@ cd pdos-local-extractor
 python -m unittest discover -s tests -v
 ```
 
-All 73 tests use committed fixtures — no real STL file is needed.
+The standard-library test suite includes more than 100 deterministic tests.
+No real user STL is required or committed. It covers malformed/truncated STL,
+binary headers beginning with `solid`, Chinese paths, distance-based welding,
+closed/open/branched boundaries, strict JSON, validation outcomes, and CLI exit
+behavior.
 
 ---
 
@@ -207,3 +246,5 @@ All 73 tests use committed fixtures — no real STL file is needed.
 **v0.1** — Phase 1.2A only.
 No feature detection, no surface construction, no Rhino output.
 Stop after PRIMARY_MESH_EVIDENCE is produced; do not enter Phase 1.3.
+
+Real user STL validation was NOT run in cloud CI.

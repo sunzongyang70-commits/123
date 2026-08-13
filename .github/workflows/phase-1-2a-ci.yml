@@ -1,0 +1,52 @@
+name: Phase 1.2A Extractor CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - codex/phase-1-2a-hardening
+
+permissions:
+  contents: read
+
+jobs:
+  unittest:
+    name: unittest (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.14"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Run standard-library test suite
+        working-directory: pdos-local-extractor
+        run: python -m unittest discover -s tests -v
+      - name: Confirm repository has no tracked Python cache files
+        run: |
+          if git ls-files | grep -E '(^|/)(__pycache__/|.*\.pyc$)'; then
+            echo "Tracked Python cache files are forbidden."
+            exit 1
+          fi
+
+  codeql:
+    name: CodeQL (Python)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      packages: read
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: python
+          build-mode: none
+      - name: Analyze
+        uses: github/codeql-action/analyze@v4

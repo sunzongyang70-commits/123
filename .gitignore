@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.DS_Store
+PRIMARY_MESH_EVIDENCE.json
+PRIMARY_MESH_EVIDENCE.validation.json
