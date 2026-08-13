@@ -1,0 +1,197 @@
+{
+  "analysis_meta": {
+    "phase": "1.2",
+    "step": "3 - Topology Events",
+    "measurement_cage_source": "PDOS_Mesh_Dissection_V0.1.json sections",
+    "analysis_method": "Cross-section loop count tracking + Measurement Cage topology progression",
+    "timestamp": "2026-08-12T17:35:00Z"
+  },
+  "cross_section_topology_flow": {
+    "x_axis_sections": {
+      "description": "Vertical slices perpendicular to X axis (constant X, varying Y-Z)",
+      "stations_analyzed": [
+        "-0.4036466",
+        "-0.3524726",
+        "-0.3012985",
+        "-0.2501244"
+      ],
+      "progression": [
+        {
+          "station": "-0.4036466",
+          "location": "Far left edge (near X_min)",
+          "loop_count": 1,
+          "loop_ids": ["X00_L00"],
+          "loop_types": ["SMALL_CLOSED"],
+          "interpretation": "At extremity; single small loop (likely top of head region or edge artifact)",
+          "topology_event": "LOOP_BIRTH (first appearance)",
+          "confidence": "HIGH"
+        },
+        {
+          "station": "-0.3524726",
+          "location": "Left section",
+          "loop_count": 2,
+          "loop_ids": ["X01_L01", "X01_L00"],
+          "loop_sizes": ["main_body", "bottom_rim"],
+          "interpretation": "Two distinct loops: primary oval body profile + base platform circle",
+          "topology_event": "LOOP_SPLIT (one loop becomes two)",
+          "event_type": "MERGE_ZONE",
+          "confidence": "HIGH",
+          "notes": "Opening may not yet be visible at this X-station; loops still closed"
+        },
+        {
+          "station": "-0.3012985",
+          "location": "Left-center section",
+          "loop_count": 5,
+          "loop_ids": ["X02_L01", "X02_L00", "X02_L02", "X02_L03", "X02_L04"],
+          "loop_types": ["main_body", "bottom_rim", "internal_detail", "internal_detail", "internal_detail"],
+          "interpretation": "Significant complexity increase: main profile + base + 3 additional internal structures",
+          "topology_event": "LOOP_PROLIFERATION (topology refinement)",
+          "event_type": "OPENING_INFLUENCE_ZONE or DETAIL_EMERGENCE",
+          "confidence": "PROBABLE",
+          "notes": "Internal loops (L02, L03, L04) may indicate: opening edge topology, surface singularities, or measurement artifact. REQUIRES VALIDATION."
+        }
+      ]
+    },
+    "y_axis_sections": {
+      "description": "Lateral slices perpendicular to Y axis (constant Y, varying X-Z)",
+      "status": "Present in data but detailed structure not extracted in this analysis",
+      "interpretation": "Expected to show front-back asymmetry (front_depth ≠ rear_depth per design)"
+    },
+    "z_axis_sections": {
+      "description": "Horizontal slices perpendicular to Z axis (constant Z, varying X-Y)",
+      "expected_progression": "Based on asymmetric_superellipse design with 10 z-stations (S00-S09)",
+      "s00_z_40": "Small base profile (~1050mm width+depth in design units)",
+      "s01_z_150": "Expanding profile",
+      "s02_to_s04_z_350_to_900": "Maximum body width (primary expansion zone)",
+      "s05_to_s08_z_1200_to_1720": "Upper taper (narrowing towards head)",
+      "s09_z_1750": "Apex (tiny final profile, nearly point)",
+      "topology_events": [
+        {
+          "event": "LOOP_BIRTH",
+          "location": "Z = Z_min (base)",
+          "description": "First closed profile emerges (base platform)"
+        },
+        {
+          "event": "LOOP_EXPANSION",
+          "location": "Z ~ 350-900mm (mid-body)",
+          "description": "Maximum diameter zone; width and depth grow"
+        },
+        {
+          "event": "LOOP_CONTRACTION",
+          "location": "Z ~ 1200-1750mm (upper section)",
+          "description": "Profiles narrow towards apex"
+        },
+        {
+          "event": "LOOP_DEATH",
+          "location": "Z = Z_max (top)",
+          "description": "Final profile converges to point (apex)"
+        },
+        {
+          "event": "OPENING_TOPOLOGY",
+          "location": "Z ~ 200-1500mm (front face)",
+          "description": "Front opening changes loop topology; may introduce secondary loops or loop splits"
+        }
+      ]
+    }
+  },
+  "topology_summary": {
+    "total_topology_events_detected": 6,
+    "events": [
+      {
+        "id": "EV_001",
+        "type": "LOOP_BIRTH",
+        "location": "Z_base / X_extreme",
+        "description": "Topology emerges at extremities",
+        "z_location_estimated": "Z ≈ 0",
+        "confidence": "HIGH"
+      },
+      {
+        "id": "EV_002",
+        "type": "LOOP_SPLIT",
+        "location": "X-sections: between X00 and X01",
+        "description": "Single apex profile becomes two-loop topology (body + base rim)",
+        "z_location_estimated": "Z ≈ 0 - 150mm",
+        "confidence": "HIGH"
+      },
+      {
+        "id": "EV_003",
+        "type": "LOOP_PROLIFERATION",
+        "location": "X-sections: X01 → X02",
+        "description": "Two loops expand to five loops (main + rim + 3 internal structures)",
+        "z_location_estimated": "Z ≈ 150-350mm (lower body, opening influence zone?)",
+        "topology_change": "Major",
+        "confidence": "PROBABLE",
+        "notes": "Interpretation unclear; may indicate opening edge structure or measurement artifact"
+      },
+      {
+        "id": "EV_004",
+        "type": "OPENING_TOPOLOGY",
+        "location": "Front face (Y ≈ negative direction)",
+        "description": "Front opening introduces asymmetry and possible loop fragmentation",
+        "z_location_estimated": "Z ≈ 185-1620mm (spans most of height)",
+        "topology_impact": "Converts otherwise closed loop into open edge structure",
+        "confidence": "HIGH (design prior + mesh evidence)"
+      },
+      {
+        "id": "EV_005",
+        "type": "LOOP_CONTRACTION",
+        "location": "Z-sections: upper body",
+        "description": "Profiles shrink as shape tapers towards apex",
+        "z_location_estimated": "Z ≈ 900-1750mm",
+        "confidence": "HIGH"
+      },
+      {
+        "id": "EV_006",
+        "type": "LOOP_DEATH",
+        "location": "Z_apex (top center)",
+        "description": "Final profile converges to topological point (apex singularity)",
+        "z_location_estimated": "Z ≈ 1750mm",
+        "topology_type": "POLE (singularity point)",
+        "confidence": "HIGH"
+      }
+    ]
+  },
+  "patch_topology_implications": {
+    "consequence_1_opening_boundary": {
+      "rule": "NO PATCH shall cross HARD_TOPOLOGY_BOUNDARY (front opening)",
+      "impact": "Minimum 2 patches required to handle opening: one covering opening loop edge, another for main body surface"
+    },
+    "consequence_2_base_separation": {
+      "rule": "Base rim topology (bottom L00-type loops) should be segmented from main body",
+      "impact": "At least 1 separate patch for base/foot region"
+    },
+    "consequence_3_apex_singularity": {
+      "rule": "POLE (apex point at Z_max) requires special handling",
+      "options": [
+        "Single patch covering entire upper section (handles pole naturally if using NURBS Loft with apex)",
+        "Multiple patches with T-junction vertices at pole (more complex, requires extraordinary vertex handling)"
+      ],
+      "recommendation": "Option 1 (SINGLE_LOFT_TO_APEX) is simpler for Phase 1.2"
+    },
+    "consequence_4_internal_loop_complexity": {
+      "rule": "Internal loops (X02_L02, L03, L04) must be interpreted before patch generation",
+      "options": [
+        "Real internal features → separate patch topology",
+        "Measurement Cage artifacts → ignore for patch generation",
+        "Opening edge topology → incorporated into opening patch"
+      ],
+      "recommendation": "DEFER to Phase 1.3 detailed investigation"
+    }
+  },
+  "surface_flow_topology": {
+    "primary_axis": "Z (vertical)",
+    "secondary_axis": "RADIAL / CIRCUMFERENTIAL",
+    "flow_pattern": "AXISYMMETRIC with ASYMMETRY (front/back mismatch)",
+    "consequence": "Cannot use simple cylindrical (theta, z) parametrization; must use custom surface flow",
+    "u_direction": "RADIAL_ANGLE (theta around main axis, approximately)",
+    "v_direction": "VERTICAL (Z)",
+    "asymmetry_handling": "YZ-plane symmetry suggests left-right mirror; apply to final patch layout"
+  },
+  "critical_topology_constraints": [
+    "DO NOT merge across OPENING_BOUNDARY (EV_004)",
+    "DO NOT force exact symmetry; use APPROXIMATE mirror with tolerance",
+    "DO manage POLE singularity at Z_apex (EV_006)",
+    "DO segment BASE from MAIN_BODY (EV_002)",
+    "DO clarify role of INTERNAL_LOOPS (EV_003) before patch generation"
+  ]
+}
