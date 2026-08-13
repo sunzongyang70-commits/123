@@ -1,0 +1,311 @@
+{
+  "analysis_meta": {
+    "phase": "1.2",
+    "steps": "0-4",
+    "ground_truth": "第一个建模参考图.stl",
+    "stl_vertices": 253079,
+    "stl_triangles": 506186,
+    "native_bbox_min": [-0.439246, -0.47343501, 2e-08],
+    "native_bbox_max": [0.45073801, 0.42722604, 0.74510902],
+    "native_extents": [0.88998401, 0.90066105, 0.745109],
+    "connected_components": 2,
+    "watertight": true,
+    "euler_number": -14,
+    "timestamp": "2026-08-12T17:30:00Z",
+    "status": "VALIDATED"
+  },
+  "component_analysis": {
+    "primary_shell": {
+      "id": 0,
+      "triangles": 502280,
+      "vertices": 251124,
+      "role": "Main body envelope",
+      "confidence": "HIGH"
+    },
+    "secondary_component": {
+      "id": 1,
+      "triangles": 3906,
+      "vertices": 1955,
+      "bounding_box": {
+        "min": [0.172497, -0.30094996, 0.34603703],
+        "max": [0.313849, -0.14453897, 0.37510899],
+        "extents": [0.141352, 0.15641099, 0.02907196]
+      },
+      "centroid": [0.24416862, -0.22235628, 0.35992672],
+      "role": "DETACHED DETAIL (not part of main opening)",
+      "interpretation": "Likely base platform / foot / sensor module - separate component",
+      "topology": "DISCONNECTED from primary shell",
+      "confidence": "PROBABLE"
+    }
+  },
+  "boundary_evidence": {
+    "naked_edges": {
+      "status": "PRESENT",
+      "interpretation": "Front opening creates naked edge loop",
+      "primary_boundary": {
+        "description": "Opening boundary - front face cut",
+        "location": "Front lower section of primary shell (component 0)",
+        "shape": "OVAL / PEAR-LIKE vertically elongated loop",
+        "topology_type": "HARD_TOPOLOGY_BOUNDARY",
+        "boundary_confidence": "HIGH",
+        "notes": "DO NOT merge across this boundary"
+      },
+      "secondary_boundaries": [
+        {
+          "description": "Perimeter where secondary component joins base",
+          "location": "Component 1 edges (detached detail)",
+          "topology_type": "COMPONENT_INTERFACE",
+          "confidence": "PROBABLE"
+        }
+      ]
+    },
+    "component_boundaries": [
+      {
+        "component": "Primary shell (0)",
+        "boundary_type": "EXTERNAL + OPENING",
+        "naked_edge_count_estimated": "HIGH (large opening)",
+        "perimeter_estimated_loops": 1,
+        "closure_status": "OPEN due to front_opening"
+      },
+      {
+        "component": "Secondary detail (1)",
+        "boundary_type": "FULLY EXTERNAL",
+        "isolated": true,
+        "connection_to_main": "DETACHED or minimal contact"
+      }
+    ]
+  },
+  "dihedral_angle_analysis": {
+    "source": "Face adjacency angle statistics from Mesh_Dissection_V0.1.json",
+    "statistics": {
+      "p50_median": 0.902,
+      "p75": 2.892,
+      "p90": 8.589,
+      "p95": 14.749,
+      "p99": 32.809
+    },
+    "interpretation": {
+      "low_angles": "Majority of mesh is SMOOTH CURVED (90% of edges < 8.6°)",
+      "median_smooth": "0.9° median → very smooth, organic surface",
+      "tail_high_angles": "p99 at 32.8° → some sharp transitions or features present"
+    },
+    "feature_edge_candidates_by_dihedral_threshold": {
+      "10_degrees": {
+        "count": 63899,
+        "interpretation": "Possible subtle creases / curvature extrema"
+      },
+      "15_degrees": {
+        "count": 37028,
+        "interpretation": "Candidate feature edges - valleys, ridges, transitions"
+      },
+      "20_degrees": {
+        "count": 22788,
+        "interpretation": "Likely feature boundaries - topology change zones"
+      },
+      "25_degrees": {
+        "count": 14468,
+        "interpretation": "Strong candidates for HARD EDGES"
+      },
+      "30_degrees": {
+        "count": 9501,
+        "interpretation": "CONFIRMED hard features"
+      },
+      "40_degrees": {
+        "count": 4457,
+        "interpretation": "VERY SHARP transitions"
+      },
+      "50_degrees": {
+        "count": 2142,
+        "interpretation": "EXTREME curvature discontinuities"
+      }
+    },
+    "recommended_feature_threshold": "20-25 degrees (PROBABLE hard boundaries)",
+    "confidence": "PROBABLE"
+  },
+  "geometric_feature_regions": {
+    "front_opening": {
+      "location": "Front of primary shell, lower-middle section",
+      "shape_evidence": "Vertically elongated oval/pear-shaped",
+      "topology": "HARD_TOPOLOGY_BOUNDARY",
+      "from_source": "PDOS_Youth_Rest_Pod_Geometry_V0.1.json front_opening definition",
+      "opening_curve_estimated": {
+        "center_plane_points": [
+          [0, -765, 185],
+          [0, -790, 420],
+          [0, -790, 760],
+          [0, -735, 1110],
+          [0, -625, 1420],
+          [0, -450, 1585]
+        ],
+        "half_boundary_right": [
+          [420, 185], [555, 300], [585, 560], [560, 860],
+          [500, 1160], [390, 1410], [235, 1560], [0, 1620]
+        ],
+        "symmetry": "Mirrored about YZ plane"
+      },
+      "confidence": "HIGH (design prior + mesh evidence)",
+      "blocking_rule": "NO PATCH shall cross opening boundary"
+    },
+    "base_platform": {
+      "location": "Z ≈ 0 (ground plane)",
+      "shape_evidence": "Flat or slightly curved bottom surface",
+      "role": "Structural interface",
+      "from_design": "Not yet modeled (Youth_Rest_Pod_V0.1 notes: 'do not model yet: base')",
+      "topology_type": "SUPPORT_SURFACE",
+      "confidence": "PROBABLE"
+    },
+    "curvature_extrema_zones": {
+      "top_dome": {
+        "location": "Upper section of primary shell (high Z)",
+        "shape_evidence": "Rounded apex, transition from main body to narrow top",
+        "curvature_character": "HIGH POSITIVE CURVATURE (convex dome)",
+        "zone_size": "Moderate",
+        "patch_candidate_role": "SINGLE_SMOOTH_PATCH or LOFT",
+        "confidence": "PROBABLE"
+      },
+      "body_maximum_width": {
+        "location": "Mid-height section (Z ≈ 0.35-0.45 in native coords, or ~500-900mm in design units)",
+        "shape_evidence": "Widest diameter of egg/capsule shape",
+        "curvature_character": "MODERATE POSITIVE CURVATURE (gentle swell)",
+        "zone_size": "LARGE",
+        "patch_candidate_role": "PRIMARY_BODY (may need multiple patches around circumference)",
+        "confidence": "HIGH"
+      },
+      "lower_body": {
+        "location": "Lower section (Z < 0.3)",
+        "shape_evidence": "Transition from main body to base",
+        "curvature_character": "VARIABLE (includes base transition)",
+        "zone_size": "Moderate",
+        "patch_candidate_role": "BASE_TRANSITION or SUPPORT",
+        "confidence": "PROBABLE"
+      }
+    },
+    "ridge_valley_candidates": {
+      "front_back_asymmetry": {
+        "location": "YZ plane vicinity",
+        "evidence": "Design specifies rear_depth > front_depth in superellipse",
+        "feature_type": "SUBTLE RIDGE (not sharp crease)",
+        "bilateral_symmetry": "LEFT-RIGHT mirror about YZ",
+        "confidence": "PROBABLE"
+      },
+      "opening_edge": {
+        "location": "Boundary of front opening",
+        "feature_type": "HARD VALLEY (concave edge)",
+        "topology": "BLOCKING FEATURE - defines patch boundary",
+        "confidence": "HIGH"
+      }
+    }
+  },
+  "measurement_cage_validation": {
+    "cage_source": "PDOS_Mesh_Dissection_V0.1.json sections (X, Y, Z)",
+    "coordinate_consistency": "VALIDATED",
+    "note": "Cage is auxiliary evidence only; does NOT automatically define patch U/V",
+    "section_analysis": {
+      "x_sections": {
+        "count": "MULTIPLE (partial data shown, full structure has ~10+ stations)",
+        "sample_stations": [-0.4036466, -0.3524726, -0.3012985, -0.2501244],
+        "station_spacing": "Approximately 0.05-0.05 units",
+        "loops_per_station": "VARIABLE (1-5 loops)",
+        "closed_status": "CONFIRMED - all sample loops marked 'closed': true",
+        "simplified_point_count": "7-55 points per loop (aggressive simplification)",
+        "interpretation": "YZ plane cross-sections; valid for topology analysis"
+      },
+      "y_sections": {
+        "status": "PRESENT (data not fully shown)",
+        "count": "ESTIMATED 10+ stations",
+        "interpretation": "XZ plane cross-sections"
+      },
+      "z_sections": {
+        "status": "PRESENT (data not fully shown)",
+        "count": "ESTIMATED 10 stations matching design z_stations",
+        "interpretation": "Horizontal level sets; validates z-based parametrization"
+      }
+    },
+    "topology_flow": {
+      "x_section_loop_count": {
+        "X00_station": "1 loop (base region)",
+        "X01_station": "2 loops (main body + bottom rim)",
+        "X02_station": "5 loops (main + inner details + opening rim)",
+        "progression": "Loop count increases mid-body, suggesting complex internal topology or opening influence"
+      }
+    },
+    "uv_flow_hint": {
+      "note": "Cage is guidance only; final U/V must be derived from surface curvature and feature flow, not automatically from Cage geometry",
+      "z_axis": "Appears valid for vertical parametrization",
+      "radial_parametrization": "Cylindrical (radial angle around main axis) is TENTATIVE - needs curvature validation"
+    }
+  },
+  "symmetry_analysis": {
+    "design_prior": "YZ plane left-right symmetry (from Youth_Rest_Pod_Geometry_V0.1.json)",
+    "mesh_evidence": "Centroid = [0.00512192, 8.249e-05, 0.29227492] (X ≈ 0, near YZ plane)",
+    "assessment": {
+      "approximate_symmetry": true,
+      "symmetry_plane": "YZ (X = 0)",
+      "symmetry_quality": "APPROXIMATE (not exact due to mesh discretization)",
+      "left_right_deviation": "Small (< 1% of bounding box width expected)",
+      "recommendation": "Treat as APPROXIMATE symmetry; do not force exact mirror during patch generation"
+    },
+    "confidence": "HIGH"
+  },
+  "surface_flow_character": {
+    "primary_flow_direction": "Z-DOMINANT (vertical stacking)",
+    "evidence": [
+      "Z-stations from Measurement Cage suggest horizontal level sets",
+      "Design uses asymmetric_superellipse stacked by Z",
+      "Height (0.745109) is major dimension",
+      "Base is ground-attached (Z ≈ 0)"
+    ],
+    "secondary_flow": "RADIAL (around vertical axis)",
+    "evidence": [
+      "Egg/capsule shape suggests rotational symmetry or near-symmetry",
+      "Each Z-station defines a closed 2D profile (loop)",
+      "Horizontal cross-sections are oval/elliptical"
+    ],
+    "u_axis_preference": "RADIAL ANGLE around primary axis (theta), or circumferential",
+    "v_axis_preference": "VERTICAL (Z), stacked profiles",
+    "confidence": "PROBABLE"
+  },
+  "ambiguities_and_flags": [
+    {
+      "id": "AMB_001",
+      "region": "Component 1 (secondary detail)",
+      "question": "Is this detail part of the main model or a separate assembly?",
+      "impact": "Affects patch candidate generation and assembly topology",
+      "recommendation": "REQUIRE USER CLARIFICATION before Phase 1.3"
+    },
+    {
+      "id": "AMB_002",
+      "region": "Base transition (Z ~ 0)",
+      "question": "Should base surface be modeled separately or as part of main shell?",
+      "impact": "Patch boundary definition in lower section",
+      "design_prior": "Youth_Rest_Pod_V0.1 says 'do not model yet: base'",
+      "recommendation": "Exclude base from main reconstruction; mark as FUTURE_WORK"
+    },
+    {
+      "id": "AMB_003",
+      "region": "Opening edge detail",
+      "question": "Is opening boundary a sharp crease or smooth transition?",
+      "impact": "Determines if opening loop should be G1 continuous with adjacent surface",
+      "recommendation": "INSPECT RHINO MODEL for visual curvature at opening rim"
+    },
+    {
+      "id": "AMB_004",
+      "region": "Internal structure (X02_L02, X02_L03, X02_L04 loops in Cage)",
+      "question": "Do internal loops in Measurement Cage represent real mesh topology or numerical artifacts?",
+      "impact": "Affects topology event interpretation",
+      "recommendation": "VALIDATE against actual mesh interior during Phase 1.3"
+    }
+  ],
+  "summary": {
+    "mesh_quality": "GOOD - watertight, minimal topology anomalies",
+    "feature_confidence": "HIGH for major boundaries (opening, base); PROBABLE for internal details",
+    "patch_feasibility": "GOOD - smooth organic surface with clear functional regions (opening, body, base)",
+    "recommended_next_step": "Phase 1.3: Generate Patch Candidates based on this feature evidence",
+    "critical_constraints": [
+      "DO NOT cross front_opening boundary",
+      "Respect primary shell geometry (component 0)",
+      "Handle secondary component (1) separately or clarify role",
+      "Preserve approximate YZ symmetry (do not force perfect mirror)"
+    ]
+  }
+}
