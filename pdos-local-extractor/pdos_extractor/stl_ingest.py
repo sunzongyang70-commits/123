@@ -5,10 +5,11 @@ No external dependencies beyond the Python standard library.
 """
 
 import hashlib
+import math
 import os
 import struct
 from dataclasses import dataclass, field
-from typing import List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 Triangle = Tuple[
     Tuple[float, float, float],  # normal
@@ -29,7 +30,7 @@ class STLIngestResult:
     triangle_count: int
     triangles: List[Triangle] = field(default_factory=list)
     parse_success: bool = True
-    parse_error: str = ""
+    parse_error: Optional[Dict[str, Any]] = None
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -48,62 +49,153 @@ def _is_ascii_stl(raw: bytes) -> bool:
     file contains b'facet normal' the format is ASCII.
     Binary files can start with 'solid' too, so also require 'facet normal'.
     """
-    head = raw[:256].lstrip()
-    return head.startswith(b"solid") and b"facet normal" in raw
+    # A binary STL header is arbitrary and may deliberately start with
+    # ``solid`` or contain the words ``facet normal``.  An exact binary record
+    # length therefore takes precedence over textual markers.
+    if len(raw) >= 84:
+        tri_count = struct.unpack_from("<I", raw, 80)[0]
+        if 84 + tri_count * 50 == len(raw):
+            return False
+    head = raw[:256].lstrip().lower()
+    lowered = raw.lower()
+    return (
+        head.startswith(b"solid")
+        and b"facet normal" in lowered
+        and b"endsolid" in lowered
+    )
 
 
-def _parse_ascii(raw: bytes) -> Tuple[List[Triangle], str]:
-    """Return (triangles, error_string). error_string == '' on success."""
+def _parse_ascii(
+    raw: bytes,
+) -> Tuple[List[Triangle], Optional[Dict[str, Any]]]:
+    """Parse ASCII STL without inventing missing or malformed coordinates.
+
+    Valid facets are collected so callers can diagnose a damaged file, but any
+    structural or numeric error makes the complete ingest unsuccessful.  The
+    caller must not compute Primary Evidence topology from a partial result.
+    """
     triangles: List[Triangle] = []
-    try:
-        text = raw.decode("utf-8", errors="replace")
-    except Exception as exc:
-        return triangles, f"Decode error: {exc}"
+    text = raw.decode("utf-8", errors="replace")
 
     lines = text.splitlines()
+    errors: List[Dict[str, Any]] = []
+
+    def add_error(line_index: int, reason: str) -> None:
+        errors.append({
+            "line_number": line_index + 1,
+            "reason": reason,
+            "raw_line": lines[line_index] if 0 <= line_index < len(lines) else "",
+        })
+
+    def parse_finite_triplet(
+        parts: List[str], line_index: int, label: str, offset: int
+    ) -> Optional[Tuple[float, float, float]]:
+        if len(parts) < offset + 3:
+            add_error(line_index, f"Malformed {label}: expected 3 coordinates")
+            return None
+        try:
+            values = tuple(float(parts[offset + j]) for j in range(3))
+        except ValueError:
+            add_error(line_index, f"Malformed {label} coordinate")
+            return None
+        if not all(math.isfinite(value) for value in values):
+            add_error(line_index, f"Non-finite {label} coordinate")
+            return None
+        return values  # type: ignore[return-value]
+
     i = 0
     n = len(lines)
     while i < n:
         line = lines[i].strip()
-        if line.startswith("facet normal"):
+        lowered = line.lower()
+        if lowered.startswith("facet normal"):
+            facet_line = i
             parts = line.split()
-            try:
-                nx, ny, nz = float(parts[2]), float(parts[3]), float(parts[4])
-            except (IndexError, ValueError):
-                nx, ny, nz = 0.0, 0.0, 0.0
+            normal = parse_finite_triplet(parts, i, "facet normal", 2)
             verts: List[Tuple[float, float, float]] = []
+            saw_outer_loop = False
+            saw_endloop = False
+            saw_endfacet = False
             i += 1
-            while i < n and len(verts) < 3:
+            while i < n:
                 vline = lines[i].strip()
-                if vline.startswith("vertex"):
+                vlower = vline.lower()
+                if vlower == "outer loop":
+                    saw_outer_loop = True
+                elif vlower.startswith("vertex"):
                     vp = vline.split()
-                    try:
-                        verts.append((float(vp[1]), float(vp[2]), float(vp[3])))
-                    except (IndexError, ValueError):
-                        verts.append((0.0, 0.0, 0.0))
+                    vertex = parse_finite_triplet(vp, i, "vertex", 1)
+                    if vertex is not None:
+                        verts.append(vertex)
+                elif vlower == "endloop":
+                    saw_endloop = True
+                elif vlower == "endfacet":
+                    saw_endfacet = True
+                    i += 1
+                    break
+                elif vlower.startswith("facet normal"):
+                    add_error(i, "Nested facet before endfacet")
+                    break
                 i += 1
-            if len(verts) == 3:
-                triangles.append(((nx, ny, nz), verts[0], verts[1], verts[2]))
+            if not saw_outer_loop:
+                add_error(facet_line, "Facet is missing outer loop")
+            if not saw_endloop:
+                add_error(facet_line, "Facet is missing endloop")
+            if not saw_endfacet:
+                add_error(facet_line, "Facet is missing endfacet")
+            if len(verts) != 3:
+                add_error(
+                    facet_line,
+                    f"Facet must contain exactly 3 valid vertices; found {len(verts)}",
+                )
+            if (
+                normal is not None
+                and len(verts) == 3
+                and saw_outer_loop
+                and saw_endloop
+                and saw_endfacet
+            ):
+                triangles.append((normal, verts[0], verts[1], verts[2]))
         else:
             i += 1
-    return triangles, ""
+    if not triangles and not errors:
+        errors.append({
+            "line_number": 1,
+            "reason": "ASCII STL contains no valid facets",
+            "raw_line": lines[0] if lines else "",
+        })
+    if errors:
+        first = dict(errors[0])
+        first["error_count"] = len(errors)
+        if len(errors) > 1:
+            first["additional_errors"] = errors[1:]
+        return triangles, first
+    return triangles, None
 
 
-def _parse_binary(raw: bytes) -> Tuple[List[Triangle], str]:
-    """Return (triangles, error_string). error_string == '' on success."""
+def _parse_binary(
+    raw: bytes,
+) -> Tuple[List[Triangle], Optional[Dict[str, Any]]]:
+    """Return triangles and a structured error, if any."""
+    def error(reason: str, offset: int = 0) -> Dict[str, Any]:
+        return {"byte_offset": offset, "reason": reason, "raw_line": None}
+
     if len(raw) < 84:
-        return [], "Binary STL too short (< 84 bytes)"
+        return [], error("Binary STL too short (< 84 bytes)")
     # bytes 0-79: header; bytes 80-83: uint32 triangle count
     try:
         tri_count = struct.unpack_from("<I", raw, 80)[0]
     except struct.error as exc:
-        return [], f"Cannot read triangle count: {exc}"
+        return [], error(f"Cannot read triangle count: {exc}", 80)
 
     expected_size = 84 + tri_count * 50
     if len(raw) < expected_size:
         return (
             [],
-            f"Truncated binary STL: expected {expected_size} bytes, got {len(raw)}",
+            error(
+                f"Truncated binary STL: expected {expected_size} bytes, got {len(raw)}",
+                len(raw),
+            ),
         )
 
     triangles: List[Triangle] = []
@@ -112,14 +204,16 @@ def _parse_binary(raw: bytes) -> Tuple[List[Triangle], str]:
         try:
             vals = struct.unpack_from("<12fH", raw, offset)
         except struct.error as exc:
-            return triangles, f"Parse error at offset {offset}: {exc}"
+            return triangles, error(f"Parse error: {exc}", offset)
+        if not all(math.isfinite(value) for value in vals[:12]):
+            return triangles, error("Non-finite binary STL coordinate", offset)
         nx, ny, nz = vals[0], vals[1], vals[2]
         v0 = (vals[3], vals[4], vals[5])
         v1 = (vals[6], vals[7], vals[8])
         v2 = (vals[9], vals[10], vals[11])
         triangles.append(((nx, ny, nz), v0, v1, v2))
         offset += 50
-    return triangles, ""
+    return triangles, None
 
 
 # ── public API ────────────────────────────────────────────────────────────────
@@ -146,7 +240,7 @@ def ingest(path: str) -> STLIngestResult:
         detected_format = "BINARY"
         triangles, error = _parse_binary(raw)
 
-    parse_success = error == ""
+    parse_success = error is None
     return STLIngestResult(
         input_path=path,
         filename=os.path.basename(path),

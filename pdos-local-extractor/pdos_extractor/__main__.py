@@ -12,6 +12,7 @@ Usage:
 
 import argparse
 import json
+import math
 import os
 import sys
 
@@ -21,6 +22,20 @@ from .evidence import build_evidence, build_validation
 
 _DEFAULT_TOPOLOGY_MODE = "both"
 _DEFAULT_SYMMETRY_MODE = "off"
+
+
+def _finite_non_negative_float(text: str) -> float:
+    try:
+        value = float(text)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(
+            "weld tolerance must be a finite, non-negative float"
+        ) from exc
+    if not math.isfinite(value) or value < 0.0:
+        raise argparse.ArgumentTypeError(
+            "weld tolerance must be a finite, non-negative float"
+        )
+    return value
 
 
 def _parse_args(argv=None):
@@ -77,7 +92,7 @@ def _parse_args(argv=None):
     )
     parser.add_argument(
         "--weld-tolerance",
-        type=float,
+        type=_finite_non_negative_float,
         default=None,
         metavar="FLOAT",
         help=(
@@ -142,10 +157,10 @@ def main(argv=None) -> int:
     raw_topo = None
     welded_topo = None
 
-    if mode in ("raw", "both"):
+    if ingest_result.parse_success and mode in ("raw", "both"):
         raw_topo = compute_topology(ingest_result, "raw_exact")
 
-    if mode in ("welded", "both"):
+    if ingest_result.parse_success and mode in ("welded", "both"):
         welded_topo = compute_topology(
             ingest_result, "welded", weld_tolerance=args.weld_tolerance
         )
@@ -192,7 +207,8 @@ def main(argv=None) -> int:
     try:
         _write_json(validation_path, validation_doc)
     except Exception as exc:
-        print(f"Warning: could not write validation file: {exc}", file=sys.stderr)
+        print(f"Could not write validation file: {exc}", file=sys.stderr)
+        return 1
 
     # ── 5. Console summary ────────────────────────────────────────────────
     overall = validation_doc["overall_status"]

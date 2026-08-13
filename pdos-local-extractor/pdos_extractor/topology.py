@@ -17,7 +17,9 @@ No external dependencies.
 
 import math
 from collections import defaultdict, deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from decimal import Decimal, ROUND_FLOOR
+from itertools import combinations
 from typing import Any, Dict, List, Optional, Tuple
 
 from .stl_ingest import STLIngestResult, Triangle
@@ -37,32 +39,61 @@ def _deduplicate_vertices(
     When weld_tolerance == 0.0 exact coordinate matching is used.
     When weld_tolerance > 0.0 a grid-based bucket merge is used.
     """
-    vertex_map: Dict[Any, int] = {}
     vertices: List[Vertex3] = []
     faces: List[Tuple[int, int, int]] = []
+    if not math.isfinite(weld_tolerance) or weld_tolerance < 0.0:
+        raise ValueError("weld_tolerance must be a finite, non-negative float")
 
-    def _key_exact(v: Vertex3) -> Any:
-        return v  # (float, float, float) — hashable tuple
+    exact_map: Dict[Vertex3, int] = {}
+    spatial_hash: Dict[Tuple[int, int, int], List[int]] = defaultdict(list)
 
-    def _key_grid(v: Vertex3) -> Any:
-        t = weld_tolerance
-        return (
-            math.floor(v[0] / t),
-            math.floor(v[1] / t),
-            math.floor(v[2] / t),
-        )
+    def canonical_vertex_id(v: Vertex3) -> int:
+        if weld_tolerance == 0.0:
+            existing = exact_map.get(v)
+            if existing is not None:
+                return existing
+            vertex_id = len(vertices)
+            vertices.append(v)
+            exact_map[v] = vertex_id
+            return vertex_id
 
-    key_fn = _key_exact if weld_tolerance == 0.0 else _key_grid
+        tolerance = weld_tolerance
+        def cell_index(coordinate: float) -> int:
+            ratio = coordinate / tolerance
+            if math.isfinite(ratio):
+                return math.floor(ratio)
+            # A positive subnormal tolerance can overflow float division even
+            # though both operands are finite. Decimal is a deterministic,
+            # standard-library fallback for this rare CLI edge case.
+            precise_ratio = (
+                Decimal.from_float(coordinate) / Decimal.from_float(tolerance)
+            )
+            return int(precise_ratio.to_integral_value(rounding=ROUND_FLOOR))
+
+        cell = tuple(cell_index(coordinate) for coordinate in v)
+        candidates: List[Tuple[float, int]] = []
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for dz in (-1, 0, 1):
+                    for vertex_id in spatial_hash.get(
+                        (cell[0] + dx, cell[1] + dy, cell[2] + dz), []
+                    ):
+                        canonical = vertices[vertex_id]
+                        distance = math.dist(v, canonical)
+                        if distance <= tolerance:
+                            candidates.append((distance, vertex_id))
+        if candidates:
+            # Minimum distance first; canonical vertex id resolves exact ties.
+            return min(candidates, key=lambda item: (item[0], item[1]))[1]
+
+        vertex_id = len(vertices)
+        vertices.append(v)
+        spatial_hash[cell].append(vertex_id)
+        return vertex_id
 
     for tri in triangles:
         _, v0, v1, v2 = tri
-        face_ids = []
-        for v in (v0, v1, v2):
-            k = key_fn(v)
-            if k not in vertex_map:
-                vertex_map[k] = len(vertices)
-                vertices.append(v)
-            face_ids.append(vertex_map[k])
+        face_ids = [canonical_vertex_id(v) for v in (v0, v1, v2)]
         if len(set(face_ids)) == 3:  # skip degenerate triangles
             faces.append((face_ids[0], face_ids[1], face_ids[2]))
 
@@ -106,11 +137,15 @@ def _build_edge_table(
 
     face_to_faces: Dict[int, List[int]] = defaultdict(list)
     for nbrs in edge_to_faces.values():
-        if len(nbrs) == 2:
-            fi, fj = nbrs
+        # All faces incident to an edge are adjacent, including non-manifold
+        # edges with more than two incident faces.
+        for fi, fj in combinations(sorted(nbrs), 2):
             face_to_faces[fi].append(fj)
             face_to_faces[fj].append(fi)
-    return dict(edge_to_faces), dict(face_to_faces)
+    return dict(edge_to_faces), {
+        face_id: sorted(set(neighbors))
+        for face_id, neighbors in face_to_faces.items()
+    }
 
 
 # ── connected components ──────────────────────────────────────────────────────
@@ -157,77 +192,133 @@ def _extract_boundary_loops(
     vertices: List[Vertex3],
 ) -> List[Dict[str, Any]]:
     """
-    Deterministically traverse boundary edges and produce loop/chain dicts.
-    Sorted by minimum vertex id for stable IDs.
+    Classify each connected boundary graph as a closed cycle, open chain, or
+    branched/non-simple graph.  Only graphs with a unique traversal are emitted
+    as ordered chains; branched graphs retain complete graph-level evidence.
     """
     if not boundary_edges:
         return []
 
-    # Build adjacency for boundary vertices
-    adj: Dict[int, List[int]] = defaultdict(list)
-    for a, b in boundary_edges:
-        adj[a].append(b)
-        adj[b].append(a)
-
-    visited_edges: set = set()
-    chains: List[List[int]] = []
-
     def _canonical(a: int, b: int) -> Edge:
         return (min(a, b), max(a, b))
 
-    # Start traversal from the smallest unvisited vertex
-    start_candidates = sorted(adj.keys())
-    for start in start_candidates:
-        # Find an unvisited edge from start
-        for nxt in sorted(adj[start]):
-            ce = _canonical(start, nxt)
-            if ce in visited_edges:
-                continue
-            # Traverse this chain
-            chain = [start]
-            visited_edges.add(ce)
-            prev, cur = start, nxt
-            while True:
-                chain.append(cur)
-                nbrs = [v for v in sorted(adj[cur]) if _canonical(cur, v) not in visited_edges]
-                if not nbrs:
-                    break
-                # Prefer not going back to prev
-                preferred = [v for v in nbrs if v != prev]
-                nxt_v = preferred[0] if preferred else nbrs[0]
-                visited_edges.add(_canonical(cur, nxt_v))
-                prev, cur = cur, nxt_v
-                if cur == start:
-                    break  # closed loop
-            chains.append(chain)
+    canonical_edges = sorted({_canonical(a, b) for a, b in boundary_edges})
+    # Build adjacency from unique canonical edges.
+    adj: Dict[int, List[int]] = defaultdict(list)
+    for a, b in canonical_edges:
+        adj[a].append(b)
+        adj[b].append(a)
 
-    loops = []
-    for idx, chain in enumerate(sorted(chains, key=lambda c: min(c))):
-        is_closed = len(chain) >= 3 and chain[0] == chain[-1]
-        # perimeter
-        perimeter = 0.0
-        coords = []
-        for vi in chain:
-            coords.append(list(vertices[vi]))
-        for i in range(len(chain) - 1):
-            a, b = chain[i], chain[i + 1]
-            va, vb = vertices[a], vertices[b]
-            perimeter += math.sqrt(sum((vb[j] - va[j]) ** 2 for j in range(3)))
+    # Connected components in the boundary graph.
+    unvisited_vertices = set(adj)
+    graph_components: List[Tuple[List[int], List[Edge]]] = []
+    while unvisited_vertices:
+        start = min(unvisited_vertices)
+        queue = deque([start])
+        component_vertices = set([start])
+        unvisited_vertices.remove(start)
+        while queue:
+            current = queue.popleft()
+            for neighbor in sorted(adj[current]):
+                if neighbor in unvisited_vertices:
+                    unvisited_vertices.remove(neighbor)
+                    component_vertices.add(neighbor)
+                    queue.append(neighbor)
+        component_edges = [
+            edge for edge in canonical_edges
+            if edge[0] in component_vertices and edge[1] in component_vertices
+        ]
+        graph_components.append((sorted(component_vertices), component_edges))
 
-        loop_id = f"BL_{idx + 1:04d}"
-        loops.append(
-            {
-                "id": loop_id,
-                "closed": is_closed,
-                "vertex_count": len(chain),
-                "perimeter": perimeter,
-                "orientation": "UNKNOWN",
-                "ordered_vertex_ids": chain,
-                "ordered_coordinates": coords,
-                "status": "CLOSED" if is_closed else "OPEN_OR_BRANCHED",
-            }
+    records: List[Dict[str, Any]] = []
+    for component_vertices, component_edges in graph_components:
+        degrees = {vertex_id: len(adj[vertex_id]) for vertex_id in component_vertices}
+        endpoints = sorted(
+            vertex_id for vertex_id, degree in degrees.items() if degree == 1
         )
-    return loops
+        all_degree_two = all(degree == 2 for degree in degrees.values())
+        is_open_chain = (
+            len(endpoints) == 2
+            and all(degrees[vertex_id] in (1, 2) for vertex_id in component_vertices)
+        )
+
+        chain: List[int] = []
+        closed = False
+        if all_degree_two and len(component_vertices) >= 3:
+            closed = True
+            start = min(component_vertices)
+            previous: Optional[int] = None
+            current = start
+            chain = [start]
+            while True:
+                choices = [
+                    neighbor for neighbor in sorted(adj[current])
+                    if neighbor != previous
+                ]
+                next_vertex = choices[0]
+                if next_vertex == start:
+                    chain.append(start)  # explicit closure
+                    break
+                chain.append(next_vertex)
+                previous, current = current, next_vertex
+            status = "CLOSED_LOOP"
+        elif is_open_chain:
+            start = min(endpoints)
+            previous = None
+            current = start
+            chain = [start]
+            while current not in endpoints or current == start:
+                choices = [
+                    neighbor for neighbor in sorted(adj[current])
+                    if neighbor != previous
+                ]
+                if not choices:
+                    break
+                next_vertex = choices[0]
+                chain.append(next_vertex)
+                previous, current = current, next_vertex
+                if current in endpoints and current != start:
+                    break
+            status = "OPEN_CHAIN"
+        else:
+            status = "BRANCHED_BOUNDARY_GRAPH"
+
+        perimeter = 0.0
+        for a, b in component_edges:
+            va, vb = vertices[a], vertices[b]
+            perimeter += math.sqrt(
+                sum((vb[axis] - va[axis]) ** 2 for axis in range(3))
+            )
+
+        records.append({
+            "id": "",  # assigned after deterministic record sorting
+            "closed": closed,
+            "vertex_count": len(component_vertices),
+            "edge_count": len(component_edges),
+            "perimeter": perimeter,
+            "orientation": "UNKNOWN",
+            "ordered_vertex_ids": chain,
+            "ordered_coordinates": [list(vertices[vertex_id]) for vertex_id in chain],
+            "graph_vertex_ids": component_vertices,
+            "graph_coordinates": [
+                list(vertices[vertex_id]) for vertex_id in component_vertices
+            ],
+            "graph_edges": [list(edge) for edge in component_edges],
+            "vertex_degrees": {
+                str(vertex_id): degrees[vertex_id]
+                for vertex_id in component_vertices
+            },
+            "status": status,
+        })
+
+    records.sort(key=lambda record: (
+        min(record["graph_vertex_ids"]),
+        record["vertex_count"],
+        tuple(tuple(coordinate) for coordinate in record["graph_coordinates"]),
+    ))
+    for index, record in enumerate(records, 1):
+        record["id"] = f"BL_{index:04d}"
+    return records
 
 
 # ── per-component stats ───────────────────────────────────────────────────────
@@ -267,7 +358,11 @@ def _component_stats(
     f_count = len(face_ids)
     euler = v_count - edge_count + f_count
 
-    watertight = boundary_edge_count == 0 and non_manifold_edge_count == 0
+    watertight = (
+        f_count > 0
+        and boundary_edge_count == 0
+        and non_manifold_edge_count == 0
+    )
 
     # Boundary loops belonging to this component
     comp_loop_ids = []
@@ -301,6 +396,7 @@ def _component_stats(
 class TopologyResult:
     variant: str  # "raw_exact" | "welded"
     weld_tolerance: float
+    weld_tolerance_status: str
     vertex_count: int
     face_count: int
     edge_count: int
@@ -312,6 +408,7 @@ class TopologyResult:
     non_manifold_edge_count: int
     watertight: bool
     euler_characteristic: int
+    degenerate_face_count: int
 
 
 def compute_topology(
@@ -323,8 +420,14 @@ def compute_topology(
     Compute mesh topology for a single variant ('raw_exact' or 'welded').
     weld_tolerance=None means it will be derived from bbox diagonal.
     """
+    if not ingest_result.parse_success:
+        raise ValueError("Cannot compute topology from an unsuccessfully parsed STL")
+    if variant not in ("raw_exact", "welded"):
+        raise ValueError("variant must be 'raw_exact' or 'welded'")
+
     if variant == "raw_exact":
         tol = 0.0
+        tolerance_status = "OBSERVED"
     else:
         if weld_tolerance is None:
             # Derive from bbox diagonal of all raw vertices
@@ -332,8 +435,13 @@ def compute_topology(
             bb = _bbox(all_verts)
             diag = bb["diagonal"]
             tol = 1e-8 * diag if diag > 0.0 else 0.0
+            tolerance_status = "DERIVED" if diag > 0.0 else "UNKNOWN"
         else:
             tol = weld_tolerance
+            tolerance_status = "OBSERVED"
+
+    if not math.isfinite(tol) or tol < 0.0:
+        raise ValueError("weld_tolerance must be a finite, non-negative float")
 
     vertices, faces = _deduplicate_vertices(ingest_result.triangles, tol)
 
@@ -348,12 +456,9 @@ def compute_topology(
     # Map loop id → edges (for per-component stats)
     loop_boundary_edges: Dict[str, List[Edge]] = {}
     for loop in boundary_loops:
-        chain = loop["ordered_vertex_ids"]
-        edges = []
-        for i in range(len(chain) - 1):
-            a, b = chain[i], chain[i + 1]
-            edges.append((min(a, b), max(a, b)))
-        loop_boundary_edges[loop["id"]] = edges
+        loop_boundary_edges[loop["id"]] = [
+            (edge[0], edge[1]) for edge in loop["graph_edges"]
+        ]
 
     comp_face_lists = _connected_components(len(faces), face_to_faces)
 
@@ -374,11 +479,16 @@ def compute_topology(
     f_count = len(faces)
     e_count = len(edge_to_faces)
     euler = v_count - e_count + f_count
-    watertight = len(boundary_edges) == 0 and len(non_manifold_edges) == 0
+    watertight = (
+        f_count > 0
+        and len(boundary_edges) == 0
+        and len(non_manifold_edges) == 0
+    )
 
     return TopologyResult(
         variant=variant,
         weld_tolerance=tol,
+        weld_tolerance_status=tolerance_status,
         vertex_count=v_count,
         face_count=f_count,
         edge_count=e_count,
@@ -390,4 +500,5 @@ def compute_topology(
         non_manifold_edge_count=len(non_manifold_edges),
         watertight=watertight,
         euler_characteristic=euler,
+        degenerate_face_count=len(ingest_result.triangles) - f_count,
     )

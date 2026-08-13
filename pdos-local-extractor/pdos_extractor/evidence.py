@@ -4,7 +4,6 @@ Assembles STLIngestResult + TopologyResult(s) into the PRIMARY_MESH_EVIDENCE
 JSON document (strict schema) plus the validation section.
 """
 
-import datetime
 import json
 import os
 import re
@@ -39,7 +38,7 @@ def _prov(
 def _topology_dict(topo: TopologyResult, sha256: str) -> Dict[str, Any]:
     prov = _prov(
         sha256,
-        "deterministic_vertex_deduplication_and_half_edge_table",
+        "deterministic_distance_welding_edge_incidence_and_face_adjacency",
         {"weld_tolerance": topo.weld_tolerance, "variant": topo.variant},
         "DERIVED",
     )
@@ -47,6 +46,7 @@ def _topology_dict(topo: TopologyResult, sha256: str) -> Dict[str, Any]:
         "provenance": prov,
         "variant": topo.variant,
         "weld_tolerance": topo.weld_tolerance,
+        "weld_tolerance_status": topo.weld_tolerance_status,
         "vertex_count": topo.vertex_count,
         "face_count": topo.face_count,
         "edge_count": topo.edge_count,
@@ -58,6 +58,7 @@ def _topology_dict(topo: TopologyResult, sha256: str) -> Dict[str, Any]:
         "non_manifold_edge_count": topo.non_manifold_edge_count,
         "watertight": topo.watertight,
         "euler_characteristic": topo.euler_characteristic,
+        "degenerate_face_count": topo.degenerate_face_count,
         "measurement_cage_used": False,
         "design_prior_used": False,
         "synthetic_geometry_count": 0,
@@ -77,6 +78,20 @@ def _validation_checks(
     output_json_str: str,
 ) -> Dict[str, Any]:
     checks = {}
+    parsed: Optional[Dict[str, Any]] = None
+
+    def reject_non_standard_constant(value: str) -> None:
+        raise ValueError(f"Illegal JSON numeric token: {value}")
+
+    try:
+        candidate = json.loads(
+            output_json_str,
+            parse_constant=reject_non_standard_constant,
+        )
+        if isinstance(candidate, dict):
+            parsed = candidate
+    except (TypeError, ValueError, json.JSONDecodeError):
+        parsed = None
 
     # 1. input file exists
     checks["input_file_exists"] = {
@@ -103,70 +118,138 @@ def _validation_checks(
     }
 
     # 5. output JSON strict parse round-trip
-    try:
-        parsed = json.loads(output_json_str)
-        round_trip_ok = isinstance(parsed, dict)
-    except Exception:
-        round_trip_ok = False
+    round_trip_ok = parsed is not None
     checks["output_json_round_trip_success"] = {
         "result": round_trip_ok,
         "expected": True,
     }
 
     # 6. topology source is STL only
+    topology_container = (parsed or {}).get("topology", {})
+    topology_docs = (
+        [value for value in topology_container.values() if isinstance(value, dict)]
+        if isinstance(topology_container, dict) else []
+    )
+    input_container = (parsed or {}).get("input", {})
+    input_prov = (
+        input_container.get("provenance", {})
+        if isinstance(input_container, dict) else {}
+    )
+    provenance_records = [input_prov] + [
+        topology_doc.get("provenance", {}) for topology_doc in topology_docs
+    ]
+    expected_variants = {
+        name for name, result in (("raw_exact", raw), ("welded", welded))
+        if result is not None
+    }
+    topology_structure_valid = (
+        isinstance(topology_container, dict)
+        and set(topology_container) == expected_variants
+        and len(topology_docs) == len(expected_variants)
+    )
+    topology_stl_only = topology_structure_valid and all(
+        provenance.get("source") == "STL"
+        and provenance.get("source_file_hash") == ingest.sha256
+        for provenance in provenance_records
+    )
     checks["topology_source_is_stl_only"] = {
-        "result": True,
+        "result": topology_stl_only,
         "expected": True,
     }
 
     # 7. measurement cage used == false
-    mc_used = False
-    if raw is not None:
-        mc_used = mc_used  # always False from our implementation
+    mc_used = any(
+        topology_doc.get("measurement_cage_used") is not False
+        for topology_doc in topology_docs
+    ) if topology_docs else False
     checks["measurement_cage_used_for_topology"] = {
-        "result": False,
+        "result": mc_used,
         "expected": False,
     }
 
     # 8. design prior used == false
+    design_prior_used = any(
+        topology_doc.get("design_prior_used") is not False
+        for topology_doc in topology_docs
+    ) if topology_docs else False
     checks["design_prior_used_for_topology"] = {
-        "result": False,
+        "result": design_prior_used,
         "expected": False,
     }
 
     # 9. synthetic geometry count == 0
+    synthetic_geometry = (parsed or {}).get("synthetic_geometry", [])
+    synthetic_count = len(synthetic_geometry) if isinstance(synthetic_geometry, list) else -1
+    for topology_doc in topology_docs:
+        value = topology_doc.get("synthetic_geometry_count", -1)
+        if not isinstance(value, int) or isinstance(value, bool):
+            synthetic_count = -1
+            break
+        synthetic_count += value
     checks["synthetic_geometry_count"] = {
-        "result": 0,
+        "result": synthetic_count,
         "expected": 0,
     }
 
     # 10. hardcoded feature coordinate count == 0
+    integrity = (parsed or {}).get("integrity", {})
+    if not isinstance(integrity, dict):
+        integrity = {}
+    hardcoded_count = integrity.get("hardcoded_feature_coordinate_count", -1)
+    if not isinstance(hardcoded_count, int) or isinstance(hardcoded_count, bool):
+        hardcoded_count = -1
     checks["hardcoded_feature_coordinate_count"] = {
-        "result": 0,
+        "result": hardcoded_count,
         "expected": 0,
     }
 
     # 11. untraceable primary evidence count == 0
+    allowed_provenance_statuses = {"OBSERVED", "DERIVED", "UNKNOWN"}
+    required_provenance_keys = {
+        "source", "source_file_hash", "method", "parameters", "status"
+    }
+    untraceable_count = sum(
+        1 for provenance in provenance_records
+        if not required_provenance_keys.issubset(provenance)
+        or provenance.get("status") not in allowed_provenance_statuses
+        or provenance.get("source") != "STL"
+        or provenance.get("source_file_hash") != ingest.sha256
+    )
     checks["untraceable_primary_evidence_count"] = {
-        "result": 0,
+        "result": untraceable_count,
         "expected": 0,
     }
 
     # 12. unknown values explicitly labeled
+    symmetry_container = (parsed or {}).get("symmetry", {})
+    if not isinstance(symmetry_container, dict):
+        symmetry_container = {}
+    unknowns_labeled = (
+        isinstance(input_container, dict)
+        and input_container.get("unit_status") == "UNKNOWN"
+        and symmetry_container.get("status") == "UNKNOWN"
+    )
     checks["unknown_values_explicitly_labeled"] = {
-        "result": True,
+        "result": unknowns_labeled,
         "expected": True,
     }
 
     # 13. phase_1_3_decision_count == 0
+    phase_decisions = (parsed or {}).get("phase_1_3_decisions", None)
+    phase_decision_count = len(phase_decisions) if isinstance(phase_decisions, list) else -1
     checks["phase_1_3_decision_count"] = {
-        "result": 0,
+        "result": phase_decision_count,
         "expected": 0,
     }
 
     # 14. contamination detected == false
+    contamination_detected = (
+        integrity.get("contamination_detected")
+        is not False
+        or integrity.get("data_sources") != ["STL"]
+    )
     checks["contamination_detected"] = {
-        "result": False,
+        "result": contamination_detected,
         "expected": False,
     }
 
@@ -192,6 +275,7 @@ def _validation_checks(
         "triangle_count_observed",
         "output_json_round_trip_success",
         "topology_source_is_stl_only",
+        "unknown_values_explicitly_labeled",
     ]
 
     fail = any(
@@ -217,6 +301,10 @@ def _validation_checks(
     if raw_welded_differ:
         warnings.append(
             "raw_exact and welded topology variants differ in one or more statistics"
+        )
+    if welded is not None and welded.weld_tolerance_status == "UNKNOWN":
+        warnings.append(
+            "weld tolerance is UNKNOWN because the STL bounding-box diagonal is zero"
         )
 
     if fail:
@@ -248,12 +336,9 @@ def build_evidence(
     JSON serialization and round-trip validation happen in the caller.
     """
     sha = ingest.sha256
-    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00","Z")
-
     doc: Dict[str, Any] = {
         "schema": SCHEMA,
         "schema_version": SCHEMA_VERSION,
-        "generated_utc": now_iso,
         "phase": "1.2A",
         "cli_parameters": cli_parameters,
         "input": {
@@ -285,6 +370,13 @@ def build_evidence(
         },
         "phase_1_3_decisions": [],
         "synthetic_geometry": [],
+        "integrity": {
+            "data_sources": ["STL"],
+            "synthetic_geometry_count": 0,
+            "hardcoded_feature_coordinate_count": 0,
+            "phase_1_3_decision_count": 0,
+            "contamination_detected": False,
+        },
     }
 
     if raw is not None:
@@ -306,7 +398,6 @@ def build_validation(
     return {
         "schema": "PDOS_PRIMARY_MESH_EVIDENCE_VALIDATION",
         "schema_version": "1.0",
-        "generated_utc": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00","Z"),
         "source_sha256": ingest.sha256,
         **gate,
     }
